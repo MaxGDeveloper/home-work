@@ -48,3 +48,24 @@
   `-ContentType 'application/json'`.
 - Пустие папки git не отслеживает: закоммитятся сами, когда внутри появятся файлы.
 - Предупреждение `LF will be replaced by CRLF` — норма, игнорировать.
+
+## Скиллы Office (установлено 10.10.2026)
+
+- Глобально установлены скиллы `docx`, `xlsx`, `pptx` из репозитория
+  https://github.com/anthropics/skills (официальные, те же, что в Claude) —
+  в `~/.config/opencode/skills/<id>/SKILL.md`. Доступны во всех проектах.
+- Python-зависимости (все установлены): `openpyxl`, `python-docx` (модуль `docx`),
+  `Pillow`, `lxml`, `python-pptx` (модуль `pptx`), `pandas`, `defusedxml`, `markitdown`.
+  `markitdown` — тяжёлый (тянет `onnxruntime`/`magika`). Его exe лежит в
+  `...\pythoncore-3.14-64\Scripts` (не на PATH у текущего процесса сервера) — вызывать
+  как `py -m markitdown <файл>`. Папка Scripts добавлена в пользовательский PATH
+  (подхватится новыми процессами).
+- npm-зависимости: `docx`, `pptxgenjs` стоят глобально
+  (`npm root -g` = `C:\Programs\node-v24.16.0-win-x64\node_modules`). Чтобы
+  `require('docx')` работал из любого каталога без `NODE_PATH`, создан junction
+  `C:\Users\maksi\.node_modules` → глобальный `node_modules` (Node ищет там по умолчанию).
+- **Ещё НЕ установлены** (нужны для чтения/конвертации/QA): `pandoc`, LibreOffice
+  (`soffice`), `pdftoppm` (Poppler). `winget`/`choco` в системе отсутствуют — ставить
+  придётся скачиванием (LibreOffice — MSI, права админа). Без них скиллы всё равно
+  создают `.docx`/`.xlsx`/`.pptx` (проверено дымовым тестом), но не рендерят в PDF/картинки.
+- Копия исходников при установке: `C:\Users\maksi\AppData\Local\Temp\opencode\anthropic-skills`.
