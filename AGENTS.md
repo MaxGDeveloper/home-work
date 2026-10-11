@@ -126,3 +126,23 @@
   придётся скачиванием (LibreOffice — MSI, права админа). Без них скиллы всё равно
   создают `.docx`/`.xlsx`/`.pptx` (проверено дымовым тестом), но не рендерят в PDF/картинки.
 - Копия исходников при установке: `C:\Users\maksi\AppData\Local\Temp\opencode\anthropic-skills`.
+
+## Скилл PDF (установлено 11.10.2026)
+
+- Официальный скилл `pdf` из https://github.com/anthropics/skills установлен глобально
+  в `~/.config/opencode/skills/pdf/` (SKILL.md + reference.md + forms.md + scripts/ для
+  заполнения форм). Загружается автоматически при работе с любыми .pdf-файлами.
+- Python-зависимости: `pypdf` 6.12, `reportlab` 4.5, `pdf2image`, `pytesseract`
+  (доустановлены 11.10.2026). Уже стояли: `pdfplumber`, `pdfminer-six`, `pypdfium2`,
+  `pandas` (из `markitdown[pdf]`).
+- **Внешние бинарники НЕ установлены** (их требует часть операций скилла): `pdftotext`/
+  `pdfimages`/`pdftoppm` (Poppler), `tesseract`, `qpdf`, `pdftk`. Ставить по требованию
+  (poppler — portable zip без админа, tesseract — installer с рус. словарём).
+- **Рабочие обходы без бинарников:**
+  - текст/таблицы — `pypdf`/`pdfplumber` (у сканов текста нет, см. ниже);
+  - OCR сканов/картинок — рендер страниц `pypdfium2` в PNG + Windows OCR
+    (Windows.Media.Ocr, язык ru; PowerShell-скрипт, как для вариантов СИИ);
+  - кодировка старых PDF (cp1251-фоны): pdfplumber даёт «кракозябры» — перечитывать
+    байты как cp1251 → UTF-8 (см. «Основы системного анализа»).
+- Модель (Big Pickle) не читает PDF/изображения напрямую — всегда извлекать текст, а
+  картинки/чертежи описывать через OCR или скриншоты не полагаясь на vision.
