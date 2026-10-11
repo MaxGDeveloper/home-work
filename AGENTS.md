@@ -79,11 +79,9 @@
   (ТУСУР, Силич М. П., 2018) — справочные пособия по «Теории систем и системному анализу»,
   привязка к курсу ИжГТУ не подтверждена. Содержимое сверстано в README-файлах раздела
   (структура ПЗ курсовой, этапы, список методов оценивания, 6 практ. занятий Силич).
-- **Извлечение текста из PDF:** оригиналы — cp1251; markitdown (`py -m markitdown`) даёт
-  битые символы, нужен перекод: прочитать байты как cp1251 → записать UTF-8 (см. заметку
-  в разделе Скиллы Office — `markitdown[pdf]` доустановлен, pdfminer-six/pdfplumber).
-  Модель не читает PDF/картинки напрямую (нет vision) — OCR картинок через Windows OCR
-  (Windows.Media.Ocr, языки en/ru), текст мелких таблиц распознаётся плохо.
+- **Извлечение текста из PDF:** методички — cp1251, markitdown/pdfplumber дают битые символы;
+  нужен перекод: читать байты как cp1251 → записать UTF-8. Модель не читает PDF/картинки
+  напрямую (нет vision) — OCR и прочие обходы описаны в глобальном `~/.config/opencode/AGENTS.md`.
 
 ## Основные правила
 
@@ -105,44 +103,5 @@
   `-ContentType 'application/json'`.
 - Пустие папки git не отслеживает: закоммитятся сами, когда внутри появятся файлы.
 - Предупреждение `LF will be replaced by CRLF` — норма, игнорировать.
-
-## Скиллы Office (установлено 10.10.2026)
-
-- Глобально установлены скиллы `docx`, `xlsx`, `pptx` из репозитория
-  https://github.com/anthropics/skills (официальные, те же, что в Claude) —
-  в `~/.config/opencode/skills/<id>/SKILL.md`. Доступны во всех проектах.
-- Python-зависимости (все установлены): `openpyxl`, `python-docx` (модуль `docx`),
-  `Pillow`, `lxml`, `python-pptx` (модуль `pptx`), `pandas`, `defusedxml`, `markitdown`.
-  `markitdown` — тяжёлый (тянет `onnxruntime`/`magika`). Его exe лежит в
-  `...\pythoncore-3.14-64\Scripts` (не на PATH у текущего процесса сервера) — вызывать
-  как `py -m markitdown <файл>`. Папка Scripts добавлена в пользовательский PATH
-  (подхватится новыми процессами).
-- npm-зависимости: `docx`, `pptxgenjs` стоят глобально
-  (`npm root -g` = `C:\Programs\node-v24.16.0-win-x64\node_modules`). Чтобы
-  `require('docx')` работал из любого каталога без `NODE_PATH`, создан junction
-  `C:\Users\maksi\.node_modules` → глобальный `node_modules` (Node ищет там по умолчанию).
-- **Ещё НЕ установлены** (нужны для чтения/конвертации/QA): `pandoc`, LibreOffice
-  (`soffice`), `pdftoppm` (Poppler). `winget`/`choco` в системе отсутствуют — ставить
-  придётся скачиванием (LibreOffice — MSI, права админа). Без них скиллы всё равно
-  создают `.docx`/`.xlsx`/`.pptx` (проверено дымовым тестом), но не рендерят в PDF/картинки.
-- Копия исходников при установке: `C:\Users\maksi\AppData\Local\Temp\opencode\anthropic-skills`.
-
-## Скилл PDF (установлено 11.10.2026)
-
-- Официальный скилл `pdf` из https://github.com/anthropics/skills установлен глобально
-  в `~/.config/opencode/skills/pdf/` (SKILL.md + reference.md + forms.md + scripts/ для
-  заполнения форм). Загружается автоматически при работе с любыми .pdf-файлами.
-- Python-зависимости: `pypdf` 6.12, `reportlab` 4.5, `pdf2image`, `pytesseract`
-  (доустановлены 11.10.2026). Уже стояли: `pdfplumber`, `pdfminer-six`, `pypdfium2`,
-  `pandas` (из `markitdown[pdf]`).
-- **Внешние бинарники НЕ установлены** (их требует часть операций скилла): `pdftotext`/
-  `pdfimages`/`pdftoppm` (Poppler), `tesseract`, `qpdf`, `pdftk`. Ставить по требованию
-  (poppler — portable zip без админа, tesseract — installer с рус. словарём).
-- **Рабочие обходы без бинарников:**
-  - текст/таблицы — `pypdf`/`pdfplumber` (у сканов текста нет, см. ниже);
-  - OCR сканов/картинок — рендер страниц `pypdfium2` в PNG + Windows OCR
-    (Windows.Media.Ocr, язык ru; PowerShell-скрипт, как для вариантов СИИ);
-  - кодировка старых PDF (cp1251-фоны): pdfplumber даёт «кракозябры» — перечитывать
-    байты как cp1251 → UTF-8 (см. «Основы системного анализа»).
-- Модель (Big Pickle) не читает PDF/изображения напрямую — всегда извлекать текст, а
-  картинки/чертежи описывать через OCR или скриншоты не полагаясь на vision.
+- Общие заметки об окружении (установленные скиллы docx/xlsx/pptx/pdf, Python/npm-зависимости,
+  обходы для PDF/OCR) — в глобальном `~/.config/opencode/AGENTS.md`, не в этом репозитории.
