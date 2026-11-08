@@ -11,43 +11,21 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# ------------------------------------ #
-# Словари для человекочитаемого вывода #
-# ------------------------------------ #
-
+# Шаблон -> слот, значение которого показывается в протоколе.
 TEMPLATES = {
     "симптом": "описание",
     "обследование": "результат",
     "причина": "статус",
 }
 
-TEMPLATE_LABELS = {
-    "симптом": "Симптом",
-    "обследование": "Обследование",
-    "причина": "Причина",
-}
-
+# Заголовки групп фактов для блока «Исходные данные».
 TEMPLATE_PLURALS = {
     "симптом": "Симптомы",
     "обследование": "Результаты обследований",
     "причина": "Возможные причины",
 }
 
-SLOT_LABELS = {
-    "описание": "описание",
-    "результат": "результат",
-    "статус": "статус",
-}
-
-RULE_DESCRIPTIONS = {
-    "П1": "Если ПК не включается, а блок питания неисправен, "
-          "то причина «блок питания» подтверждается.",
-    "П2": "Если вентилятор шумит, корпус горячий и температура процессора "
-          "выше нормы, то причина «перегрев» подтверждается.",
-    "П3": "Если оперативная память исправна, то причина «память» "
-          "опровергается, а запланированный тест памяти отменяется.",
-}
-
+# Человекочитаемые названия причин и действий для итогового отчёта.
 CAUSE_LABELS = {
     "блок_питания": "неисправность блока питания",
     "перегрев": "перегрев процессора",
@@ -61,44 +39,29 @@ ACTION_LABELS = {
 
 
 def human(text):
-    """Подчёркивания -> пробелы, чтобы текст читался по-человечески."""
     return str(text).replace("_", " ")
 
 
 def describe_fact(fact):
-    """Человекочитаемое описание факта."""
-    label = TEMPLATE_LABELS.get(fact.template, fact.template)
+    label = human(fact.template).capitalize()
     ident = human(fact.id)
     primary = TEMPLATES.get(fact.template)
     if primary and primary in fact.slots:
         return f"{label} «{ident}»: {human(fact.slots[primary])}"
     if fact.slots:
-        parts = ", ".join(f"{SLOT_LABELS.get(k, k)} = {human(v)}"
-                          for k, v in fact.slots.items())
+        parts = ", ".join(f"{k} = {human(v)}" for k, v in fact.slots.items())
         return f"{label} «{ident}» ({parts})"
     return f"{label} «{ident}»"
 
 
-# ---------------------- #
-# Факты и рабочая память #
-# ---------------------- #
-
 @dataclass
 class Fact:
-    """Факт рабочей памяти: экземпляр шаблона со значениями слотов."""
-
     template: str
     id: str
     slots: dict
 
-    def __str__(self):
-        details = ", ".join(f"{k}={v}" for k, v in self.slots.items())
-        return f"{self.template}({self.id}{'; ' + details if details else ''})"
-
 
 class WorkingMemory:
-    """Рабочая память: хранение фактов и операции над ними."""
-
     def __init__(self, facts):
         self._facts = {(f.template, f.id): f for f in facts}
 
@@ -106,46 +69,36 @@ class WorkingMemory:
         return [f for f in self._facts.values()
                 if template is None or f.template == template]
 
-    def get(self, template, ident):
-        return self._facts.get((template, ident))
-
     def match(self, template, ident=None, slots=None):
         return [f for f in self.all(template)
                 if (ident is None or f.id == ident)
                 and not any(f.slots.get(k) != v for k, v in (slots or {}).items())]
 
     def add(self, fact):
-        if (fact.template, fact.id) in self._facts:
-            return False, f"факт уже есть: {fact}"
-        self._facts[(fact.template, fact.id)] = fact
-        return True, f"добавлен факт {fact}"
+        key = (fact.template, fact.id)
+        if key in self._facts:
+            return False
+        self._facts[key] = fact
+        return True
 
     def modify(self, template, ident, slots):
+        """Возвращает {слот: (старое, новое)} либо None, если менять нечего."""
         fact = self._facts.get((template, ident))
         if fact is None:
-            return False, f"нет факта {template}({ident})"
-        changes = ", ".join(f"{k}: {fact.slots.get(k)} -> {v}"
-                            for k, v in slots.items() if fact.slots.get(k) != v)
+            return None
+        changes = {k: (fact.slots.get(k), v) for k, v in slots.items()
+                   if fact.slots.get(k) != v}
         if not changes:
-            return False, f"факт {fact} не изменился"
+            return None
         fact.slots.update(slots)
-        return True, f"изменён факт {template}({ident}): {changes}"
+        return changes
 
     def delete(self, template, ident):
-        fact = self._facts.pop((template, ident), None)
-        if fact is None:
-            return False, f"нет факта {template}({ident})"
-        return True, f"удалён факт {fact}"
+        return self._facts.pop((template, ident), None) is not None
 
-
-# -------------------------- #
-# Условия, действия, правила #
-# -------------------------- #
 
 @dataclass(frozen=True)
 class Condition:
-    """Условие правила: образец факта."""
-
     template: str
     id: str
     slots: dict = field(default_factory=dict)
@@ -153,8 +106,6 @@ class Condition:
 
 @dataclass(frozen=True)
 class Action:
-    """Действие правила: операция над фактом."""
-
     op: str
     template: str
     id: str
@@ -179,8 +130,6 @@ def drop_fact(template, ident):
 
 @dataclass
 class Rule:
-    """Продукция "ЕСЛИ ... ТО ..."."""
-
     number: str
     name: str
     conditions: list
@@ -192,7 +141,6 @@ class Rule:
 
 
 def build_rules():
-    """База знаний: три правила, порядок задаёт разрешение конфликтов."""
     return [
         Rule("П1", "Неисправность блока питания",
              [cond("симптом", "не_включается"),
@@ -201,7 +149,8 @@ def build_rules():
              [change_fact("причина", "блок_питания", статус="подтверждена"),
               add_fact("обследование", "заменить_блок_питания",
                        результат="требуется")],
-             description=RULE_DESCRIPTIONS.get("П1", "")),
+             "Если ПК не включается, а блок питания неисправен, "
+             "то причина «блок питания» подтверждается."),
         Rule("П2", "Перегрев процессора",
              [cond("симптом", "шум_вентилятора"),
               cond("симптом", "перегрев_корпуса"),
@@ -211,23 +160,19 @@ def build_rules():
              [change_fact("причина", "перегрев", статус="подтверждена"),
               add_fact("обследование", "очистить_охлаждение",
                        результат="требуется")],
-             description=RULE_DESCRIPTIONS.get("П2", "")),
+             "Если вентилятор шумит, корпус горячий и температура процессора "
+             "выше нормы, то причина «перегрев» подтверждается."),
         Rule("П3", "Память исправна",
              [cond("обследование", "оперативная_память", результат="исправно"),
               cond("причина", "память", статус="возможна")],
              [change_fact("причина", "память", статус="опровергнута"),
               drop_fact("обследование", "тест_памяти")],
-             description=RULE_DESCRIPTIONS.get("П3", "")),
+             "Если оперативная память исправна, то причина «память» "
+             "опровергается, а запланированный тест памяти отменяется."),
     ]
 
 
-# --------------------------------------------- #
-# Машина вывода с человекочитаемой трассировкой #
-# --------------------------------------------- #
-
 class InferenceEngine:
-    """Машина прямого вывода: цикл "распознавание - действие"."""
-
     def __init__(self, rules, facts, log=None):
         self.wm = WorkingMemory(facts)
         self.rules = rules
@@ -242,32 +187,28 @@ class InferenceEngine:
     def _describe_condition(self, condition, matched):
         if matched:
             return describe_fact(matched[0])
-        label = TEMPLATE_LABELS.get(condition.template, condition.template)
+        label = human(condition.template).capitalize()
         ident = human(condition.id)
         if condition.slots:
-            parts = ", ".join(f"{SLOT_LABELS.get(k, k)} = {human(v)}"
+            parts = ", ".join(f"{k} = {human(v)}"
                               for k, v in condition.slots.items())
             return f"{label} «{ident}» ({parts}) — НЕ найдено"
         return f"{label} «{ident}» — НЕ найдено"
 
-    def _describe_action_result(self, action, ok, old_values):
-        label = TEMPLATE_LABELS.get(action.template, action.template)
+    def _describe_action_result(self, action, ok, changes):
+        label = human(action.template).capitalize()
         ident = human(action.id)
         if action.op == "add":
-            fact = Fact(action.template, action.id, dict(action.slots))
-            if ok:
-                return f"+ Добавлено: {describe_fact(fact)}"
-            return f"· Уже в памяти: {describe_fact(fact)}"
+            text = describe_fact(
+                Fact(action.template, action.id, dict(action.slots)))
+            return f"+ Добавлено: {text}" if ok else f"· Уже в памяти: {text}"
         if action.op == "modify":
-            if not ok:
+            if not changes:
                 return f"· {label} «{ident}» не изменено"
-            changes = []
-            for k, v in action.slots.items():
-                if old_values.get(k) != v:
-                    changes.append(
-                        f"{SLOT_LABELS.get(k, k)}: "
-                        f"«{human(old_values.get(k))}» → «{human(v)}»")
-            return f"→ {label} «{ident}»: " + "; ".join(changes)
+            parts = "; ".join(
+                f"{k}: «{human(old)}» → «{human(new)}»"
+                for k, (old, new) in changes.items())
+            return f"→ {label} «{ident}»: {parts}"
         if ok:
             return f"− Удалено: {label} «{ident}»"
         return f"· {label} «{ident}» — не найдено, удалять нечего"
@@ -307,27 +248,21 @@ class InferenceEngine:
             self.write()
 
     def apply(self, action):
-        old_values = {}
-        if action.op == "modify":
-            fact = self.wm.get(action.template, action.id)
-            if fact is not None:
-                old_values = dict(fact.slots)
-            ok, _ = self.wm.modify(action.template, action.id, dict(action.slots))
-        elif action.op == "add":
-            ok, _ = self.wm.add(
-                Fact(action.template, action.id, dict(action.slots)))
+        changes = None
+        if action.op == "add":
+            ok = self.wm.add(Fact(action.template, action.id,
+                                  dict(action.slots)))
+        elif action.op == "modify":
+            changes = self.wm.modify(action.template, action.id,
+                                     dict(action.slots))
+            ok = changes is not None
         else:
-            ok, _ = self.wm.delete(action.template, action.id)
+            ok = self.wm.delete(action.template, action.id)
         self.stats[action.op] += int(ok)
-        self.write("    " + self._describe_action_result(action, ok, old_values))
+        self.write("    " + self._describe_action_result(action, ok, changes))
 
-
-# ------------------------------------------- #
-# Сценарий, оформление протокола, точка входа #
-# ------------------------------------------- #
 
 def scenario():
-    """ПК не включается, вентилятор шумит, корпус горячий."""
     return [
         Fact("симптом", "не_включается",
              {"описание": "при нажатии кнопки питания нет реакции"}),
@@ -345,8 +280,6 @@ def scenario():
 
 
 class Tee:
-    """Вывод одновременно в консоль и в файл протокола."""
-
     def __init__(self, *streams):
         self.streams = streams
 
